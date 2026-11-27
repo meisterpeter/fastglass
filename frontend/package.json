@@ -9,6 +9,9 @@
     "preview": "vite preview --port 5173"
   },
   "dependencies": {
+    "@gmod/bbi": "^12.2.0",
+    "buffer": "^6.0.3",
+    "hic-straw": "^4.0.1",
     "lucide-react": "^0.511.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

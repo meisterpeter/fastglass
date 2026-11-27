@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Sparkles, Upload } from 'lucide-react';
-import { uploadTrack } from './api';
+import { GitCompareArrows, Sparkles, Upload } from 'lucide-react';
+import { getRuntimeMode, uploadTrack } from './api';
 import { FileDrawer } from './components/FileDrawer';
 import { HeatmapTrack } from './components/HeatmapTrack';
 import { OneDTrack } from './components/OneDTrack';
@@ -8,13 +8,23 @@ import { RulerTrack } from './components/RulerTrack';
 import { TopBar } from './components/TopBar';
 import { useViewerStore } from './store/useViewerStore';
 
-const DEMO_PATHS = [
+const LOCAL_DEMO_PATHS = [
   '382_merge_2000.mcool',
   'genome://ce11',
   'data/annotations/chrX_17_TADs.bed',
   'data/annotations/chromStates_L3_Evans2016_ce11_rgb.bed',
   'data/annotations/chrX_382_cis_eigenvectors_2kb.tsv',
   'data/chip_targets/Kim2022_eLife_DPY27_SDC3_chrX_ce11_2kb.tsv',
+];
+
+const ONLINE_DEMO_PATHS = [
+  'demo://wt_hic',
+  'genome://ce11',
+  'demo://tads',
+  'demo://chromstates',
+  'demo://eigenvector',
+  'demo://chip',
+  'demo://loops',
 ];
 
 export const App: React.FC = () => {
@@ -33,6 +43,13 @@ export const App: React.FC = () => {
   const dragIdxRef = useRef<number | null>(null);
   const [fileDragActive, setFileDragActive] = useState(false);
   const [loadingDemo, setLoadingDemo] = useState(false);
+  const [runtimeMode, setRuntimeMode] = useState<'server' | 'browser'>('browser');
+
+  useEffect(() => {
+    getRuntimeMode()
+      .then((m) => setRuntimeMode(m))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const el = mainRef.current;
@@ -127,8 +144,41 @@ export const App: React.FC = () => {
   const loadDemoWorkspace = async () => {
     setLoadingDemo(true);
     try {
-      for (const p of DEMO_PATHS) {
+      const list = runtimeMode === 'server' ? LOCAL_DEMO_PATHS : ONLINE_DEMO_PATHS;
+      for (const p of list) {
         await addTrackByPath(p);
+      }
+    } finally {
+      setLoadingDemo(false);
+    }
+  };
+
+  const loadComparisonDemo = async () => {
+    setLoadingDemo(true);
+    try {
+      await addTrackByPath('demo://wt_hic');
+      await addTrackByPath('demo://ko_hic');
+      await addTrackByPath('genome://ce11');
+      await addTrackByPath('demo://tads');
+      await addTrackByPath('demo://eigenvector');
+      await addTrackByPath('demo://chip');
+
+      const st = useViewerStore.getState();
+      const wtTrack = st.tracks.find((t) => t.trackId === 'demo://wt_hic');
+      const koTrack = st.tracks.find((t) => t.trackId === 'demo://ko_hic');
+      if (wtTrack && koTrack) {
+        st.updateTrack(wtTrack.id, {
+          compareMode: 'split',
+          compareTrackId: koTrack.trackId,
+          compareTrackName: koTrack.meta.name,
+        });
+        st.updateTrack(koTrack.id, {
+          compareMode: 'log2ratio',
+          compareTrackId: wtTrack.trackId,
+          compareTrackName: wtTrack.meta.name,
+          matrixMode: 'triangle',
+          height: 240,
+        });
       }
     } finally {
       setLoadingDemo(false);
@@ -172,14 +222,28 @@ export const App: React.FC = () => {
                   <span className="text-slate-300 font-mono">.tsv/.csv</span> files directly here.
                 </p>
 
-                <div className="pt-2 flex items-center justify-center gap-2">
+                <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
                   <button
                     onClick={() => void loadDemoWorkspace()}
                     disabled={loadingDemo}
                     className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-xs font-medium text-white shadow-lg shadow-sky-900/30 transition-colors"
                   >
-                    {loadingDemo ? 'Loading tracks...' : 'Load Workspace Sample (Hi-C + TADs + ChIP + Eigenvector)'}
+                    {loadingDemo
+                      ? 'Loading tracks...'
+                      : runtimeMode === 'server'
+                        ? 'Load Workspace Sample (Hi-C + TADs + ChIP + Eigenvector)'
+                        : 'Launch Interactive Demo (Hi-C + ce11 Genes + Tracks)'}
                   </button>
+                  {runtimeMode === 'browser' && (
+                    <button
+                      onClick={() => void loadComparisonDemo()}
+                      disabled={loadingDemo}
+                      className="px-4 py-2 rounded-lg bg-violet-600/90 hover:bg-violet-500 disabled:opacity-50 text-xs font-medium text-white shadow-lg shadow-violet-900/30 flex items-center gap-1.5 transition-colors"
+                    >
+                      <GitCompareArrows className="w-3.5 h-3.5" />
+                      <span>Split &amp; Differential Demo (WT vs KO)</span>
+                    </button>
+                  )}
                 </div>
 
                 <div className="text-[11px] text-slate-500 pt-2">

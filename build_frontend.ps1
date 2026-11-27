@@ -26,6 +26,9 @@ try {
     }
     Write-Host "Type-checking and building production bundle..." -ForegroundColor Cyan
     npm run build
+    if ($LASTEXITCODE -ne 0) {
+        throw "Frontend build failed with exit code $LASTEXITCODE"
+    }
 } finally {
     Pop-Location
 }

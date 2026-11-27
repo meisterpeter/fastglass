@@ -11,7 +11,7 @@ import {
   Search,
   Upload,
 } from 'lucide-react';
-import { listFiles, uploadTrack } from '../api';
+import { getRuntimeMode, listFiles, uploadTrack } from '../api';
 import { useViewerStore } from '../store/useViewerStore';
 import type { FsEntry } from '../types';
 
@@ -51,7 +51,14 @@ export const FileDrawer: React.FC = () => {
   const [openingPath, setOpeningPath] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const [manualPath, setManualPath] = useState('');
+  const [isBrowserMode, setIsBrowserMode] = useState(false);
   const uploadRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    getRuntimeMode()
+      .then((m) => setIsBrowserMode(m === 'browser'))
+      .catch(() => {});
+  }, []);
 
   const loadDir = useCallback(async (dirPath = '') => {
     setLoading(true);
@@ -141,19 +148,23 @@ export const FileDrawer: React.FC = () => {
           </div>
         </div>
 
-        {/* Paste any local path */}
+        {/* Paste local path or remote HTTPS URL */}
         <form onSubmit={handleManualOpen} className="flex gap-1">
           <input
             type="text"
             value={manualPath}
             onChange={(e) => setManualPath(e.target.value)}
-            placeholder="Paste local file path..."
+            placeholder={
+              isBrowserMode
+                ? 'Paste https:// URL (.hic, .bw, .bed, .tsv)...'
+                : 'Paste local file path...'
+            }
             className="flex-1 min-w-0 h-7 bg-slate-950 border border-slate-700/80 rounded px-2 text-[11px] font-mono text-slate-200 focus:outline-none focus:border-sky-500"
           />
           <button
             type="submit"
             className="h-7 px-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-slate-200"
-            title="Open path"
+            title={isBrowserMode ? 'Load remote URL' : 'Open path'}
           >
             <FilePlus2 className="w-3.5 h-3.5" />
           </button>
@@ -280,7 +291,17 @@ export const FileDrawer: React.FC = () => {
 
       {/* Supported formats footer */}
       <div className="px-2.5 py-2 border-t border-slate-800 text-[10px] text-slate-500 leading-relaxed">
-        Supports <span className="text-slate-400">.mcool, .cool, .hic, .bw, .bb, .bed, .bedGraph, .gtf, .gff3, .bedpe, .tsv, .csv</span>. Drag &amp; drop files anywhere.
+        {isBrowserMode ? (
+          <>
+            100% client-side in browser: drop or open local{' '}
+            <span className="text-slate-400">.hic, .bw, .bb, .bed, .bedGraph, .gtf, .gff3, .bedpe, .tsv, .csv</span>{' '}
+            files or paste remote URLs.
+          </>
+        ) : (
+          <>
+            Supports <span className="text-slate-400">.mcool, .cool, .hic, .bw, .bb, .bed, .bedGraph, .gtf, .gff3, .bedpe, .tsv, .csv</span>. Drag &amp; drop files anywhere.
+          </>
+        )}
       </div>
     </aside>
   );

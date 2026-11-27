@@ -1,3 +1,4 @@
+import { browserBackend } from './engine/browserBackend';
 import type {
   ArcItem,
   FsListResponse,
@@ -10,19 +11,74 @@ import type {
 
 const BASE = '';
 
-export async function fetchHealth(): Promise<{ status: string; root: string; tracks_open: number }> {
+type RuntimeMode = 'unknown' | 'server' | 'browser';
+
+const STATIC_FORCED =
+  import.meta.env.VITE_STATIC_MODE === 'true' ||
+  (typeof window !== 'undefined' &&
+    (window.location.hostname.endsWith('github.io') || window.location.protocol === 'file:'));
+
+let detectedMode: RuntimeMode = STATIC_FORCED ? 'browser' : 'unknown';
+let modePromise: Promise<'server' | 'browser'> | null = null;
+
+export async function getRuntimeMode(): Promise<'server' | 'browser'> {
+  if (detectedMode !== 'unknown') return detectedMode;
+  if (modePromise) return modePromise;
+
+  modePromise = (async () => {
+    const ctrl = new AbortController();
+    const t = window.setTimeout(() => ctrl.abort(), 1200);
+    try {
+      const res = await fetch(`${BASE}/api/health`, { signal: ctrl.signal });
+      if (res.ok) {
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('application/json')) {
+          detectedMode = 'server';
+          return 'server';
+        }
+      }
+    } catch {
+      // No local server reachable -> use browser-native serverless engine
+    } finally {
+      window.clearTimeout(t);
+    }
+    detectedMode = 'browser';
+    return 'browser';
+  })();
+  return modePromise;
+}
+
+export function isStaticBrowserMode(): boolean {
+  return detectedMode === 'browser';
+}
+
+export async function fetchHealth(): Promise<{
+  status: string;
+  root: string;
+  tracks_open: number;
+  mode: 'server' | 'browser';
+}> {
+  const mode = await getRuntimeMode();
+  if (mode === 'browser') {
+    return { status: 'ok', root: 'Browser (Serverless)', tracks_open: 0, mode: 'browser' };
+  }
   const res = await fetch(`${BASE}/api/health`);
   if (!res.ok) throw new Error(`Backend health error: ${res.status}`);
-  return res.json();
+  const data = await res.json();
+  return { ...data, mode: 'server' };
 }
 
 export async function fetchGenomes(): Promise<GenomeInfo[]> {
+  const mode = await getRuntimeMode();
+  if (mode === 'browser') return browserBackend.listGenomes();
   const res = await fetch(`${BASE}/api/genomes`);
   if (!res.ok) throw new Error(`Failed to fetch genomes (${res.status})`);
   return res.json();
 }
 
 export async function openGenomeTrack(genomeId: string): Promise<TrackMetadata> {
+  const mode = await getRuntimeMode();
+  if (mode === 'browser') return browserBackend.openGenome(genomeId);
   const res = await fetch(`${BASE}/api/genomes/${encodeURIComponent(genomeId)}/open`, {
     method: 'POST',
   });
@@ -45,6 +101,8 @@ export async function searchGenes(
   limit = 12,
   signal?: AbortSignal
 ): Promise<GeneSearchHit[]> {
+  const mode = await getRuntimeMode();
+  if (mode === 'browser') return browserBackend.searchGenes(genomeId, q, limit, signal);
   const params = new URLSearchParams({ q, limit: String(limit) });
   const res = await fetch(
     `${BASE}/api/genomes/${encodeURIComponent(genomeId)}/search?${params}`,
@@ -55,6 +113,8 @@ export async function searchGenes(
 }
 
 export async function listFiles(path = '', onlySupported = true): Promise<FsListResponse> {
+  const mode = await getRuntimeMode();
+  if (mode === 'browser') return browserBackend.listDemoFiles();
   const params = new URLSearchParams();
   if (path) params.set('path', path);
   params.set('only_supported', String(onlySupported));
@@ -67,6 +127,10 @@ export async function listFiles(path = '', onlySupported = true): Promise<FsList
 }
 
 export async function openTrack(path: string, formatOverride?: string): Promise<TrackMetadata> {
+  const mode = await getRuntimeMode();
+  if (mode === 'browser' || path.startsWith('demo://')) {
+    return browserBackend.openByPath(path);
+  }
   const res = await fetch(`${BASE}/api/tracks/open`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -86,6 +150,10 @@ export async function openTrack(path: string, formatOverride?: string): Promise<
 }
 
 export async function uploadTrack(file: File): Promise<TrackMetadata> {
+  const mode = await getRuntimeMode();
+  if (mode === 'browser') {
+    return browserBackend.openLocalFile(file);
+  }
   const fd = new FormData();
   fd.append('file', file);
   const res = await fetch(`${BASE}/api/tracks/upload`, {
@@ -106,6 +174,11 @@ export async function uploadTrack(file: File): Promise<TrackMetadata> {
 }
 
 export async function closeTrack(trackId: string): Promise<void> {
+  const mode = await getRuntimeMode();
+  if (mode === 'browser' || trackId.startsWith('demo://') || trackId.startsWith('browser-')) {
+    browserBackend.closeTrack(trackId);
+    return;
+  }
   await fetch(`${BASE}/api/tracks/${encodeURIComponent(trackId)}`, { method: 'DELETE' });
 }
 
@@ -128,6 +201,10 @@ export async function fetchTile2D(
   tileSize = 256,
   signal?: AbortSignal
 ): Promise<Tile2DData> {
+  const mode = await getRuntimeMode();
+  if (mode === 'browser' || trackId.startsWith('demo://') || trackId.startsWith('browser-')) {
+    return browserBackend.tile2d(trackId, chrom, resolution, tileX, tileY, norm, tileSize);
+  }
   const params = new URLSearchParams({
     chrom_x: chrom,
     chrom_y: chrom,
@@ -168,6 +245,10 @@ export async function fetchSignal1D(
   column?: string | null,
   signal?: AbortSignal
 ): Promise<Signal1DData> {
+  const mode = await getRuntimeMode();
+  if (mode === 'browser' || trackId.startsWith('demo://') || trackId.startsWith('browser-')) {
+    return browserBackend.signal1d(trackId, chrom, start, end, bins, column);
+  }
   const params = new URLSearchParams({
     chrom,
     start: String(Math.max(0, Math.floor(start))),
@@ -205,6 +286,10 @@ export async function fetchFeatures1D(
   maxItems = 4000,
   signal?: AbortSignal
 ): Promise<Features1DResponse> {
+  const mode = await getRuntimeMode();
+  if (mode === 'browser' || trackId.startsWith('demo://') || trackId.startsWith('browser-')) {
+    return browserBackend.features1d(trackId, chrom, start, end, maxItems);
+  }
   const params = new URLSearchParams({
     chrom,
     start: String(Math.max(0, Math.floor(start))),
@@ -224,6 +309,10 @@ export async function fetchFeatures2D(
   maxItems = 4000,
   signal?: AbortSignal
 ): Promise<{ items: ArcItem[] }> {
+  const mode = await getRuntimeMode();
+  if (mode === 'browser' || trackId.startsWith('demo://') || trackId.startsWith('browser-')) {
+    return browserBackend.features2d(trackId, chrom, start, end, maxItems);
+  }
   const params = new URLSearchParams({
     chrom_x: chrom,
     chrom_y: chrom,

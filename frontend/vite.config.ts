@@ -3,7 +3,16 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
+  base: './',
   plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      buffer: 'buffer/',
+    },
+  },
+  define: {
+    global: 'globalThis',
+  },
   server: {
     port: 5173,
     proxy: {

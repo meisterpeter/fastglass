@@ -2,6 +2,9 @@
 
 A lightweight, zero-ingest rewrite of HiGlass designed for **effortless multi-format track management** and **GPU-accelerated 60–120 FPS browsing**.
 
+**Live Online App (GitHub Pages)**: https://meisterpeter.github.io/fastglass/
+*(Runs 100% client-side in your browser with interactive demo datasets, live UCSC consensus gene search/tracks, remote URL streaming, and private local file loading for `.hic`, `.bw`/`.bb`, `.bed`, `.bedGraph`, `.gtf`/`.gff3`, `.bedpe`, and `.tsv`/`.csv`. Use `./run.ps1` locally to also read `.mcool`/`.cool` HDF5 files directly from disk.)*
+
 ## Features
 
 - **Zero-Ingest Direct File Reading**: Open local `.mcool`, `.cool`, `.hic`, `.bigWig`/`.bw`, `.bigBed`/`.bb`, `.bed`, `.bedGraph`, `.gtf`, `.gff3`, `.bedpe`, and generic `.tsv`/`.csv` files directly from disk with no Docker, PostgreSQL, or `clodius` preprocessing.

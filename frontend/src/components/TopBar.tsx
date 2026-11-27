@@ -14,7 +14,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
-import { fetchGenomes, searchGenes } from '../api';
+import { fetchGenomes, getRuntimeMode, searchGenes } from '../api';
 import { formatBp, formatBpExact, parseLocus, sharedCamera } from '../engine/camera';
 import { exportViewPNG, exportViewSVG } from '../engine/exporter';
 import { useViewerStore } from '../store/useViewerStore';
@@ -43,11 +43,15 @@ export const TopBar: React.FC = () => {
   const [geneHits, setGeneHits] = useState<GeneSearchHit[]>([]);
   const [searchFocused, setSearchFocused] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [runtimeMode, setRuntimeMode] = useState<'server' | 'browser' | null>(null);
 
   const editingRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    getRuntimeMode()
+      .then((m) => setRuntimeMode(m))
+      .catch(() => {});
     fetchGenomes()
       .then((list) => setGenomes(list))
       .catch(() => {});
@@ -179,6 +183,14 @@ export const TopBar: React.FC = () => {
       <div className="flex items-center gap-1.5 mr-1 shrink-0">
         <div className="w-2.5 h-2.5 rounded-sm bg-gradient-to-tr from-sky-400 via-amber-300 to-rose-500" />
         <span className="font-semibold tracking-tight text-sm text-slate-100">FastGlass</span>
+        {runtimeMode === 'browser' && (
+          <span
+            className="hidden sm:inline text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+            title="Running 100% client-side in your browser — local files never leave your machine"
+          >
+            Online
+          </span>
+        )}
       </div>
 
       {/* Consensus Genome Selector + 1-click Gene Track */}
