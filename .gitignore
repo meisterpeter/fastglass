@@ -1,0 +1,21 @@
+# Python backend
+backend/.venv/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Frontend build & dependencies
+frontend/node_modules/
+frontend/dist/
+
+# Runtime caches & uploads
+.uploads/
+.genome_cache/
+*.tmp
+
+# OS / editor artifacts
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
