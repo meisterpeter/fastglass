@@ -27,14 +27,20 @@ export const RulerTrack: React.FC = () => {
     };
   }, []);
 
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect || rect.width <= 0) return;
-    const frac = (e.clientX - rect.left) / rect.width;
-    const factor = e.deltaY > 0 ? 1.25 : 0.8;
-    sharedCamera.zoomAtFraction(frac, factor);
-  };
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 0) return;
+      const frac = (e.clientX - rect.left) / rect.width;
+      const factor = e.deltaY > 0 ? 1.25 : 0.8;
+      sharedCamera.zoomAtFraction(frac, factor);
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     dragRef.current = { active: true, lastX: e.clientX };
@@ -66,7 +72,6 @@ export const RulerTrack: React.FC = () => {
   return (
     <div
       ref={containerRef}
-      onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}

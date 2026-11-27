@@ -340,6 +340,7 @@ export class WebGLHeatmapRenderer {
 
     const tex = gl.createTexture();
     if (!tex) throw new Error('Failed to create tile texture');
+    gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
@@ -407,6 +408,7 @@ export class WebGLHeatmapRenderer {
     for (const pair of ordered) {
       const tile = pair.tileA;
       const texA = this.getOrUploadTile(tile);
+      const texB = pair.tileB ? this.getOrUploadTile(pair.tileB) : this.dummyTex;
       const tileSpan = tile.tileSize * tile.resolution;
       const gx0 = tile.tx * tileSpan;
       const gx1 = gx0 + tileSpan;
@@ -416,14 +418,12 @@ export class WebGLHeatmapRenderer {
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, texA);
 
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, this.lutTex);
+
       gl.activeTexture(gl.TEXTURE2);
-      if (pair.tileB) {
-        gl.bindTexture(gl.TEXTURE_2D, this.getOrUploadTile(pair.tileB));
-        gl.uniform1i(this.loc.u_hasB, 1);
-      } else {
-        gl.bindTexture(gl.TEXTURE_2D, this.dummyTex);
-        gl.uniform1i(this.loc.u_hasB, 0);
-      }
+      gl.bindTexture(gl.TEXTURE_2D, texB);
+      gl.uniform1i(this.loc.u_hasB, pair.tileB ? 1 : 0);
 
       gl.uniform4f(this.loc.u_tileBp, gx0, gx1, gy0, gy1);
       gl.drawArrays(gl.TRIANGLES, 0, 6);

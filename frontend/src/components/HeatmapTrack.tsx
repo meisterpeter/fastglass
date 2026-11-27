@@ -404,14 +404,21 @@ export const HeatmapTrack: React.FC<Props> = ({
     };
   }, [overlayTracksKey]);
 
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect || rect.width <= 0) return;
-    const frac = (e.clientX - rect.left) / rect.width;
-    const factor = e.deltaY > 0 ? 1.22 : 0.82;
-    sharedCamera.zoomAtFraction(frac, factor);
-  };
+  // Attach non-passive wheel listener so preventDefault works cleanly with 0 console warnings
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 0) return;
+      const frac = (e.clientX - rect.left) / rect.width;
+      const factor = e.deltaY > 0 ? 1.22 : 0.82;
+      sharedCamera.zoomAtFraction(frac, factor);
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -845,7 +852,6 @@ export const HeatmapTrack: React.FC<Props> = ({
       {/* WebGL2 + 2D Overlay Canvases (kept mounted so GPU textures stay warm on collapse/expand) */}
       <div
         ref={containerRef}
-        onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

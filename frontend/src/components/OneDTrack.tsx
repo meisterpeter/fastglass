@@ -192,14 +192,20 @@ export const OneDTrack: React.FC<Props> = ({
     track.bedStyle,
   ]);
 
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect || rect.width <= 0) return;
-    const frac = (e.clientX - rect.left) / rect.width;
-    const factor = e.deltaY > 0 ? 1.22 : 0.82;
-    sharedCamera.zoomAtFraction(frac, factor);
-  };
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 0) return;
+      const frac = (e.clientX - rect.left) / rect.width;
+      const factor = e.deltaY > 0 ? 1.22 : 0.82;
+      sharedCamera.zoomAtFraction(frac, factor);
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [track.visible]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -503,7 +509,6 @@ export const OneDTrack: React.FC<Props> = ({
       {track.visible && (
         <div
           ref={containerRef}
-          onWheel={handleWheel}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
